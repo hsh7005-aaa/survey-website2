@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>설문조사</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0d0d;
+      --surface: #161616;
+      --border: #2a2a2a;
+      --accent: #c8f97a;
+      --accent-dim: #a8d45a;
+      --text: #f0f0f0;
+      --muted: #888;
+      --radius: 12px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Noto Sans KR', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 640px;
+    }
+
+    .header {
+      margin-bottom: 48px;
+    }
+
+    .header .tag {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 16px;
+    }
+
+    .header h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(32px, 6vw, 52px);
+      line-height: 1.1;
+      color: var(--text);
+    }
+
+    .header p {
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      margin-bottom: 16px;
+    }
+
+    .field-label {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .field-label span {
+      color: var(--accent);
+      margin-left: 4px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-size: 15px;
+      color: var(--text);
+      font-family: 'Noto Sans KR', sans-serif;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent);
+    }
+
+    .options {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 10px;
+    }
+
+    .option-btn {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 10px;
+      font-size: 13px;
+      color: var(--muted);
+      font-family: 'Noto Sans KR', sans-serif;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s;
+    }
+
+    .option-btn:hover {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    .option-btn.selected {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #0d0d0d;
+      font-weight: 700;
+    }
+
+    textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-size: 14px;
+      color: var(--text);
+      font-family: 'Noto Sans KR', sans-serif;
+      resize: vertical;
+      min-height: 100px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    textarea:focus {
+      border-color: var(--accent);
+    }
+
+    .submit-btn {
+      width: 100%;
+      background: var(--accent);
+      color: #0d0d0d;
+      border: none;
+      border-radius: var(--radius);
+      padding: 18px;
+      font-size: 15px;
+      font-weight: 700;
+      font-family: 'Noto Sans KR', sans-serif;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      margin-top: 8px;
+    }
+
+    .submit-btn:hover { background: var(--accent-dim); }
+    .submit-btn:active { transform: scale(0.99); }
+    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .results-link {
+      display: block;
+      text-align: center;
+      margin-top: 20px;
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: none;
+    }
+
+    .results-link:hover { color: var(--accent); }
+
+    .toast {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--accent);
+      color: #0d0d0d;
+      padding: 14px 28px;
+      border-radius: 50px;
+      font-weight: 700;
+      font-size: 14px;
+      transition: transform 0.3s ease;
+      pointer-events: none;
+    }
+
+    .toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="tag">📋 Survey 2025</div>
+      <h1>서비스 만족도<br/>설문조사</h1>
+      <p>소중한 의견을 남겨주세요. 더 나은 서비스를 위해 활용됩니다.</p>
+    </div>
+
+    <!-- 이름 -->
+    <div class="card">
+      <div class="field-label">이름 (선택)</div>
+      <input type="text" id="name" placeholder="홍길동" />
+    </div>
+
+    <!-- 연령대 -->
+    <div class="card">
+      <div class="field-label">연령대 <span>*</span></div>
+      <div class="options" id="age_group">
+        <button class="option-btn" data-value="10대">10대</button>
+        <button class="option-btn" data-value="20대">20대</button>
+        <button class="option-btn" data-value="30대">30대</button>
+        <button class="option-btn" data-value="40대">40대</button>
+        <button class="option-btn" data-value="50대+">50대+</button>
+      </div>
+    </div>
+
+    <!-- 만족도 -->
+    <div class="card">
+      <div class="field-label">전반적 만족도 <span>*</span></div>
+      <div class="options" id="satisfaction">
+        <button class="option-btn" data-value="매우 불만족">😞 매우 불만족</button>
+        <button class="option-btn" data-value="불만족">😕 불만족</button>
+        <button class="option-btn" data-value="보통">😐 보통</button>
+        <button class="option-btn" data-value="만족">🙂 만족</button>
+        <button class="option-btn" data-value="매우 만족">😄 매우 만족</button>
+      </div>
+    </div>
+
+    <!-- 이용빈도 -->
+    <div class="card">
+      <div class="field-label">이용 빈도 <span>*</span></div>
+      <div class="options" id="frequency">
+        <button class="option-btn" data-value="매일">매일</button>
+        <button class="option-btn" data-value="주 2-3회">주 2-3회</button>
+        <button class="option-btn" data-value="주 1회">주 1회</button>
+        <button class="option-btn" data-value="월 1-2회">월 1-2회</button>
+        <button class="option-btn" data-value="가끔">가끔</button>
+      </div>
+    </div>
+
+    <!-- 추천여부 -->
+    <div class="card">
+      <div class="field-label">지인에게 추천하시겠습니까? <span>*</span></div>
+      <div class="options" id="recommend">
+        <button class="option-btn" data-value="매우 그렇다">매우 그렇다</button>
+        <button class="option-btn" data-value="그렇다">그렇다</button>
+        <button class="option-btn" data-value="보통">보통</button>
+        <button class="option-btn" data-value="아니다">아니다</button>
+        <button class="option-btn" data-value="매우 아니다">매우 아니다</button>
+      </div>
+    </div>
+
+    <!-- 의견 -->
+    <div class="card">
+      <div class="field-label">추가 의견 (선택)</div>
+      <textarea id="comment" placeholder="자유롭게 의견을 남겨주세요..."></textarea>
+    </div>
+
+    <button class="submit-btn" id="submitBtn" onclick="submitSurvey()">설문 제출하기 →</button>
+    <a href="/results" class="results-link">📊 결과 보기</a>
+  </div>
+
+  <div class="toast" id="toast">✅ 제출 완료! 감사합니다.</div>
+
+  <script>
+    const selections = {};
+
+    document.querySelectorAll('.options').forEach(group => {
+      group.querySelectorAll('.option-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          group.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+          btn.classList.add('selected');
+          selections[group.id] = btn.dataset.value;
+        });
+      });
+    });
+
+    async function submitSurvey() {
+      const required = ['age_group', 'satisfaction', 'frequency', 'recommend'];
+      for (const key of required) {
+        if (!selections[key]) {
+          alert(`'${document.querySelector(`#${key}`).previousElementSibling.innerText.replace(' *', '')}' 항목을 선택해주세요.`);
+          return;
+        }
+      }
+
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.textContent = '제출 중...';
+
+      try {
+        const res = await fetch('/api/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: document.getElementById('name').value || '익명',
+            age_group: selections['age_group'],
+            satisfaction: selections['satisfaction'],
+            frequency: selections['frequency'],
+            recommend: selections['recommend'],
+            comment: document.getElementById('comment').value
+          })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          const toast = document.getElementById('toast');
+          toast.classList.add('show');
+          setTimeout(() => { window.location.href = '/results'; }, 2000);
+        } else {
+          alert('오류: ' + data.error);
+          btn.disabled = false;
+          btn.textContent = '설문 제출하기 →';
+        }
+      } catch (e) {
+        alert('네트워크 오류가 발생했습니다.');
+        btn.disabled = false;
+        btn.textContent = '설문 제출하기 →';
+      }
+    }
+  </script>
+</body>
+</html>
