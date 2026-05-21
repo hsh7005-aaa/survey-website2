@@ -1,30 +1,44 @@
 import json
 import os
+import hashlib
+import hmac
+import time
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler
 
 import gspread
 from google.oauth2.credentials import Credentials as OAuthCredentials
-import requests as req
 
-from auth import get_admin_from_cookie
-
-
-def get_sheet_with_token(access_token):
-    creds = OAuthCredentials(token=access_token)
-    client = gspread.authorize(creds)
-    return client.open_by_key(os.environ["SPREADSHEET_ID"]).sheet1
+SECRET = os.environ["FLASK_SECRET_KEY"]
 
 
-def get_access_token_from_cookie(headers):
-    cookie_header = headers.get("Cookie", "")
+def verify_token(token):
+    try:
+        email, ts, sig = token.split(":")
+        if int(time.time()) - int(ts) > 86400:
+            return None
+        expected = hmac.new(SECRET.encode(), f"{email}:{ts}".encode(), hashlib.sha256).hexdigest()
+        if hmac.compare_digest(sig, expected):
+            return email
+    except:
+        pass
+    return None
+
+
+def get_cookie(headers, key):
     cookies = {}
-    for part in cookie_header.split(";"):
+    for part in headers.get("Cookie", "").split(";"):
         part = part.strip()
         if "=" in part:
             k, v = part.split("=", 1)
             cookies[k.strip()] = v.strip()
-    return cookies.get("access_token", "")
+    return cookies.get(key, "")
+
+
+def get_sheet(access_token):
+    creds = OAuthCredentials(token=access_token)
+    client = gspread.authorize(creds)
+    return client.open_by_key(os.environ["SPREADSHEET_ID"]).sheet1
 
 
 class handler(BaseHTTPRequestHandler):
@@ -40,8 +54,8 @@ class handler(BaseHTTPRequestHandler):
             body = self.rfile.read(length)
             data = json.loads(body)
 
-            access_token = get_access_token_from_cookie(self.headers)
-            sheet = get_sheet_with_token(access_token)
+            access_token = get_cookie(self.headers, "access_token")
+            sheet = get_sheet(access_token)
 
             existing = sheet.get_all_values()
             if not existing or existing[0][0] != "타임스탬프":
