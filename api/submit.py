@@ -11,18 +11,19 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 
+
 def get_sheet():
-    creds_dict = json.loads(os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON"))
+    creds_dict = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"])
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     client = gspread.authorize(creds)
-    return client.open_by_key(os.environ.get("SPREADSHEET_ID")).sheet1
+    return client.open_by_key(os.environ["SPREADSHEET_ID"]).sheet1
 
 
 class handler(BaseHTTPRequestHandler):
 
     def do_OPTIONS(self):
         self.send_response(200)
-        self._send_cors_headers()
+        self._cors()
         self.end_headers()
 
     def do_POST(self):
@@ -32,12 +33,10 @@ class handler(BaseHTTPRequestHandler):
             data = json.loads(body)
 
             sheet = get_sheet()
-
-            # 헤더 없으면 추가
             existing = sheet.get_all_values()
             if not existing or existing[0][0] != "타임스탬프":
                 sheet.insert_row(
-                    ["타임스탬프","이름","연령대","만족도","이용빈도","추천여부","의견"],
+                    ["타임스탬프", "이름", "연령대", "만족도", "이용빈도", "추천여부", "의견"],
                     index=1
                 )
 
@@ -52,19 +51,19 @@ class handler(BaseHTTPRequestHandler):
             ])
 
             self.send_response(200)
-            self._send_cors_headers()
+            self._cors()
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"success": True}).encode())
 
         except Exception as e:
             self.send_response(500)
-            self._send_cors_headers()
+            self._cors()
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"success": False, "error": str(e)}).encode())
 
-    def _send_cors_headers(self):
+    def _cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
