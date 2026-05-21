@@ -21,30 +21,6 @@ def make_token(email):
     return f"{email}:{ts}:{sig}"
 
 
-def verify_token(token):
-    try:
-        email, ts, sig = token.split(":")
-        if int(time.time()) - int(ts) > 86400:
-            return None
-        expected = hmac.new(SECRET.encode(), f"{email}:{ts}".encode(), hashlib.sha256).hexdigest()
-        if hmac.compare_digest(sig, expected):
-            return email
-    except:
-        pass
-    return None
-
-
-def get_admin_from_cookie(headers):
-    cookie_header = headers.get("Cookie", "")
-    cookies = {}
-    for part in cookie_header.split(";"):
-        part = part.strip()
-        if "=" in part:
-            k, v = part.split("=", 1)
-            cookies[k.strip()] = v.strip()
-    return verify_token(cookies.get("admin_token", ""))
-
-
 class handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
@@ -84,8 +60,10 @@ class handler(BaseHTTPRequestHandler):
                 self._respond(401, {"error": "token exchange failed"})
                 return
 
-            user_res = requests.get("https://www.googleapis.com/oauth2/v2/userinfo",
-                                    headers={"Authorization": f"Bearer {access_token}"})
+            user_res = requests.get(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
             email = user_res.json().get("email", "")
 
             if email != ADMIN_EMAIL:
@@ -94,7 +72,6 @@ class handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            # 관리자 인증 쿠키 + access_token 쿠키 모두 저장
             admin_token = make_token(email)
             self.send_response(302)
             self.send_header("Set-Cookie", f"admin_token={admin_token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400")
