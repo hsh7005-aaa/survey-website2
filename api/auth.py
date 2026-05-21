@@ -42,8 +42,7 @@ def get_admin_from_cookie(headers):
         if "=" in part:
             k, v = part.split("=", 1)
             cookies[k.strip()] = v.strip()
-    token = cookies.get("admin_token", "")
-    return verify_token(token)
+    return verify_token(cookies.get("admin_token", ""))
 
 
 class handler(BaseHTTPRequestHandler):
@@ -51,13 +50,12 @@ class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path
 
-        # /api/auth/login → Google OAuth 시작
         if path == "/api/auth/login":
             params = {
                 "client_id": CLIENT_ID,
                 "redirect_uri": REDIRECT_URI,
                 "response_type": "code",
-                "scope": "openid email profile",
+                "scope": "openid email profile https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive",
                 "access_type": "online",
                 "prompt": "select_account"
             }
@@ -66,7 +64,6 @@ class handler(BaseHTTPRequestHandler):
             self.send_header("Location", url)
             self.end_headers()
 
-        # /api/auth/callback → 코드 교환 후 쿠키 발급
         elif path == "/api/auth/callback":
             qs = parse_qs(urlparse(self.path).query)
             code = qs.get("code", [None])[0]
@@ -74,7 +71,6 @@ class handler(BaseHTTPRequestHandler):
                 self._respond(400, {"error": "no code"})
                 return
 
-            # 토큰 교환
             token_res = requests.post("https://oauth2.googleapis.com/token", data={
                 "code": code,
                 "client_id": CLIENT_ID,
@@ -88,11 +84,9 @@ class handler(BaseHTTPRequestHandler):
                 self._respond(401, {"error": "token exchange failed"})
                 return
 
-            # 이메일 확인
             user_res = requests.get("https://www.googleapis.com/oauth2/v2/userinfo",
                                     headers={"Authorization": f"Bearer {access_token}"})
-            user_info = user_res.json()
-            email = user_info.get("email", "")
+            email = user_res.json().get("email", "")
 
             if email != ADMIN_EMAIL:
                 self.send_response(302)
@@ -100,17 +94,18 @@ class handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return
 
-            # 쿠키 발급 후 결과 페이지로
-            token = make_token(email)
+            # 관리자 인증 쿠키 + access_token 쿠키 모두 저장
+            admin_token = make_token(email)
             self.send_response(302)
-            self.send_header("Set-Cookie", f"admin_token={token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400")
+            self.send_header("Set-Cookie", f"admin_token={admin_token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400")
+            self.send_header("Set-Cookie", f"access_token={access_token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=3600")
             self.send_header("Location", "/results")
             self.end_headers()
 
-        # /api/auth/logout
         elif path == "/api/auth/logout":
             self.send_response(302)
             self.send_header("Set-Cookie", "admin_token=; Path=/; Max-Age=0")
+            self.send_header("Set-Cookie", "access_token=; Path=/; Max-Age=0")
             self.send_header("Location", "/")
             self.end_headers()
 
