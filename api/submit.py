@@ -4,19 +4,27 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler
 
 import gspread
-from google.oauth2.service_account import Credentials
+from google.oauth2.credentials import Credentials as OAuthCredentials
+import requests as req
 
-SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
+from auth import get_admin_from_cookie
 
 
-def get_sheet():
-    creds_dict = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"])
-    creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+def get_sheet_with_token(access_token):
+    creds = OAuthCredentials(token=access_token)
     client = gspread.authorize(creds)
     return client.open_by_key(os.environ["SPREADSHEET_ID"]).sheet1
+
+
+def get_access_token_from_cookie(headers):
+    cookie_header = headers.get("Cookie", "")
+    cookies = {}
+    for part in cookie_header.split(";"):
+        part = part.strip()
+        if "=" in part:
+            k, v = part.split("=", 1)
+            cookies[k.strip()] = v.strip()
+    return cookies.get("access_token", "")
 
 
 class handler(BaseHTTPRequestHandler):
@@ -32,7 +40,9 @@ class handler(BaseHTTPRequestHandler):
             body = self.rfile.read(length)
             data = json.loads(body)
 
-            sheet = get_sheet()
+            access_token = get_access_token_from_cookie(self.headers)
+            sheet = get_sheet_with_token(access_token)
+
             existing = sheet.get_all_values()
             if not existing or existing[0][0] != "타임스탬프":
                 sheet.insert_row(
