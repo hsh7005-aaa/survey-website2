@@ -2,31 +2,44 @@ import json
 import os
 from collections import Counter
 from http.server import BaseHTTPRequestHandler
+from urllib.parse import urlparse
 
 import gspread
 from google.oauth2.service_account import Credentials
+
+from auth import get_admin_from_cookie
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
 
+
 def get_sheet():
-    creds_dict = json.loads(os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON"))
+    creds_dict = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"])
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     client = gspread.authorize(creds)
-    return client.open_by_key(os.environ.get("SPREADSHEET_ID")).sheet1
+    return client.open_by_key(os.environ["SPREADSHEET_ID"]).sheet1
 
 
 class handler(BaseHTTPRequestHandler):
 
     def do_OPTIONS(self):
         self.send_response(200)
-        self._send_cors_headers()
+        self._cors()
         self.end_headers()
 
     def do_GET(self):
-        self._send_cors_headers
+        # 관리자 인증 확인
+        admin = get_admin_from_cookie(self.headers)
+        if not admin:
+            self.send_response(401)
+            self._cors()
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": "unauthorized", "login_url": "/api/auth/login"}).encode())
+            return
+
         try:
             sheet = get_sheet()
             all_rows = sheet.get_all_records()
@@ -40,19 +53,19 @@ class handler(BaseHTTPRequestHandler):
             }
 
             self.send_response(200)
-            self._send_cors_headers()
+            self._cors()
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps(result).encode())
 
         except Exception as e:
             self.send_response(500)
-            self._send_cors_headers()
+            self._cors()
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"error": str(e)}).encode())
 
-    def _send_cors_headers(self):
+    def _cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
