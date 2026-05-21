@@ -1,29 +1,44 @@
 import json
 import os
+import hashlib
+import hmac
+import time
 from collections import Counter
 from http.server import BaseHTTPRequestHandler
 
 import gspread
 from google.oauth2.credentials import Credentials as OAuthCredentials
 
-from auth import get_admin_from_cookie
+SECRET = os.environ["FLASK_SECRET_KEY"]
 
 
-def get_sheet_with_token(access_token):
-    creds = OAuthCredentials(token=access_token)
-    client = gspread.authorize(creds)
-    return client.open_by_key(os.environ["SPREADSHEET_ID"]).sheet1
+def verify_token(token):
+    try:
+        email, ts, sig = token.split(":")
+        if int(time.time()) - int(ts) > 86400:
+            return None
+        expected = hmac.new(SECRET.encode(), f"{email}:{ts}".encode(), hashlib.sha256).hexdigest()
+        if hmac.compare_digest(sig, expected):
+            return email
+    except:
+        pass
+    return None
 
 
-def get_access_token_from_cookie(headers):
-    cookie_header = headers.get("Cookie", "")
+def get_cookie(headers, key):
     cookies = {}
-    for part in cookie_header.split(";"):
+    for part in headers.get("Cookie", "").split(";"):
         part = part.strip()
         if "=" in part:
             k, v = part.split("=", 1)
             cookies[k.strip()] = v.strip()
-    return cookies.get("access_token", "")
+    return cookies.get(key, "")
+
+
+def get_sheet(access_token):
+    creds = OAuthCredentials(token=access_token)
+    client = gspread.authorize(creds)
+    return client.open_by_key(os.environ["SPREADSHEET_ID"]).sheet1
 
 
 class handler(BaseHTTPRequestHandler):
@@ -34,7 +49,7 @@ class handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        admin = get_admin_from_cookie(self.headers)
+        admin = verify_token(get_cookie(self.headers, "admin_token"))
         if not admin:
             self.send_response(401)
             self._cors()
@@ -44,8 +59,8 @@ class handler(BaseHTTPRequestHandler):
             return
 
         try:
-            access_token = get_access_token_from_cookie(self.headers)
-            sheet = get_sheet_with_token(access_token)
+            access_token = get_cookie(self.headers, "access_token")
+            sheet = get_sheet(access_token)
             all_rows = sheet.get_all_records()
 
             result = {
